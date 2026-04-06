@@ -56,18 +56,20 @@ jobs:
 
     - name: Patch xmake.lua
       run: |
-        # 1. 彻底解决 lame 报错：
-        # - shared=false: 强制编译静态库，避开 libtool 对 .so 的路径处理问题
-        # - frontend=false: 不编译 lame 命令行工具（报错就在这里），只保留库
-        # - nasm=false: 交叉编译环境下禁用汇编优化以增强兼容性
-        sed -i 's/add_requires("lame")/add_requires("lame", {configs = {shared = false, frontend = false, nasm = false}})/g' xmake.lua
+        # 1. 更加健壮的正则替换，确保匹配所有 add_requires("lame"...) 的变体
+        # 强制禁用 shared, frontend 和 nasm，同时启用静态编译
+        sed -i 's/add_requires("lame".*)/add_requires("lame", {configs = {shared = false, frontend = false, nasm = false}})/g' xmake.lua
         
         # 2. 强制项目使用 C++17 标准
         echo 'set_languages("c++17")' >> xmake.lua
 
     - name: Configure xmake
       run: |
-        # 增加 --jobs=1 确保在配置包阶段不会因为并行导致竞争（可选，但更保险）
+        # 直接在命令行强制注入包配置（最高优先级）
+        # --lame:shared=n 等参数会覆盖 xmake.lua 中的默认设置
+        # 设置 MAKEFLAGS=-j1 避免在编译 lame 时的并行竞争
+        export MAKEFLAGS="-j1"
+        
         xmake f -y -c \
           --plat=linux \
           --arch=arm64-v8a \
@@ -79,11 +81,15 @@ jobs:
           --qt="$(pwd)/aarch64-linux-qt-5.15.2" \
           --build-platform=YDP02X \
           --target-channel=dev \
+          --lame:shared=n \
+          --lame:frontend=n \
+          --lame:nasm=n \
           -m debug \
           -vD
 
     - name: Build Project
       run: |
-        # 如果 lame 依然报错，尝试强制先安装依赖
-        xmake require -y lame
+        # 先强制安装依赖包，确保 lame 独立完成静态构建
+        # 使用 --jobs=1 防止多线程下 libtool 报错信息被淹没或产生竞态
+        xmake require -y --jobs=1 lame
         xmake build -v
