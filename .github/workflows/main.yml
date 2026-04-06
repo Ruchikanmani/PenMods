@@ -56,13 +56,20 @@ jobs:
 
     - name: Patch xmake.lua
       run: |
-        echo 'add_requireconfs("lame", {configs = {shared = false, frontend = false, nasm = false}})' >> xmake.lua
-        echo 'set_languages("c++17")' >> xmake.lua
-        tail -n 5 xmake.lua
+        cat >> xmake.lua <<EOF
 
-    - name: Configure xmake
+        set_policy("package.requires_jobs", 1)
+        add_requireconfs("lame", {configs = {shared = false, frontend = false, nasm = false}})
+
+        set_languages("c++17")
+        EOF
+        echo "==== Final xmake.lua check ===="
+        tail -n 10 xmake.lua
+
+    - name: Configure and Build
+      env:
+        XMAKE_JOBS: 1
       run: |
-        xmake g --jobs=1
         xmake f -y -c \
           --plat=linux \
           --arch=arm64-v8a \
@@ -77,6 +84,4 @@ jobs:
           -m debug \
           -vD
 
-    - name: Build Project
-      run: |
-        xmake build -y -v --jobs=1
+        xmake build -y -v
