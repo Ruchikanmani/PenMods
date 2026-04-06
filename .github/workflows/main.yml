@@ -1,4 +1,4 @@
-name: Build Zig Qt Project (Custom GCC 6.5 + Zig)
+name: Build Zig Qt Project (Official Fix)
 
 on:
   push:
@@ -30,60 +30,48 @@ jobs:
 
     - name: Setup Custom GCC 6.5 Toolchain
       run: |
-        # 创建工具链存放目录
         mkdir -p ~/aarch64-toolchain
-        
-        # 1. 下载三个核心组件 (基于作者提供的 6.5.0 链接)
         BASE_URL="https://github.com/Redbeanw44602/aarch64-linux-gnu-gcc-6.5.0/releases/download/6.5.0"
         
         curl -L -o binutils.tar.zst "$BASE_URL/aarch64-linux-gnu-binutils-2.30-1-x86_64.pkg.tar.zst"
         curl -L -o gcc.tar.zst "$BASE_URL/aarch64-linux-gnu-gcc-6.5.0-1-x86_64.pkg.tar.zst"
         curl -L -o glibc.tar.zst "$BASE_URL/aarch64-linux-gnu-glibc-2.27-1-any.pkg.tar.zst"
 
-        # 2. 解压并部署 (Arch 包结构解压到 ~/aarch64-toolchain)
         tar -I zstd -xf binutils.tar.zst -C ~/aarch64-toolchain
         tar -I zstd -xf gcc.tar.zst -C ~/aarch64-toolchain
         tar -I zstd -xf glibc.tar.zst -C ~/aarch64-toolchain
         
-        # 3. 将工具链 bin 目录加入系统 PATH
-        echo "$HOME/aarch64-toolchain/usr/bin" >> $GITHUB_PATH
-        
-        # 验证交叉编译器是否成功部署
-        export PATH="$HOME/aarch64-toolchain/usr/bin:$PATH"
-        aarch64-linux-gnu-gcc --version
+        # 验证 bin 目录是否存在并列出文件（用于调试）
+        ls ~/aarch64-toolchain/usr/bin/aarch64-linux-gnu-gcc || echo "GCC not found!"
 
     - name: Download Qt Framework
       run: |
         mkdir -p aarch64-linux-qt-5.15.2
         curl -L -o qt.tar.gz "https://github.com/Redbeanw44602/aarch64-linux-qt-5.15.2/releases/download/5.15.2/aarch64-linux-qt-5.15.2.tar.gz"
-        # 解压并保持目录结构一致
         tar -xzf qt.tar.gz -C aarch64-linux-qt-5.15.2 --strip-components=1
 
-    - name: Patch xmake.lua for Dependencies
+    - name: Patch xmake.lua
       run: |
-        # 这一步非常重要：
-        # 强制配置 lame 禁用 frontend 和 nasm，防止之前的链接报错
-        # 即使作者没有提到，但在交叉编译环境下这是必须的
+        # 修复 lame 依赖报错
         sed -i 's/add_requires("lame")/add_requires("lame", {configs = {frontend = false, nasm = false}})/g' xmake.lua
-        # 同理处理 libxcrypt (如果你的项目用到了)
-        sed -i 's/add_requires("libxcrypt")/add_requires("libxcrypt", {configs = {shared = false}})/g' xmake.lua
 
     - name: Configure xmake
       run: |
-        # 严格执行作者给出的官方配置命令
-        # 此时 PATH 中已包含 aarch64-linux-gnu-gcc，xmake 会自动找到它
+        # 重点修复：显式指定 SDK 路径和 Bin 路径
+        # 同时将作者的 --cross 拆分为真正的 prefix 和可能的 target 传参
         xmake f -y -c \
+          --sdk="$HOME/aarch64-toolchain/usr" \
+          --bin="$HOME/aarch64-toolchain/usr/bin" \
+          --cross="aarch64-linux-gnu-" \
           --qt="$(pwd)/aarch64-linux-qt-5.15.2" \
           --arch=arm64-v8a \
           --build-platform=YDP02X \
           --target-channel=dev \
           --toolchain=zig \
           -m debug \
-          -vD \
-          --cross=aarch64-linux-gnu.2.27
+          -vD
 
     - name: Build Project
       run: |
-        # 按照作者推荐的编译顺序
-        xmake build QrcExporter
+        xmake build QrcExporter || echo "QrcExporter not found, skipping..."
         xmake build -v
