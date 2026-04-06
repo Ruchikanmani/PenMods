@@ -1,0 +1,47 @@
+name: Build Zig Qt Project (Native ARM64)
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04-arm64
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Zig
+      uses: mlugg/setup-zig@v2
+      with:
+        version: master
+
+    - name: Setup xmake
+      uses: xmake-io/github-action-setup-xmake@v1
+      with:
+        xmake-version: latest
+
+    - name: Download Qt from Release
+      run: |
+        mkdir -p aarch64-linux-qt-5.15.2
+        curl -L -o qt.tar.gz "https://github.com/Redbeanw44602/aarch64-linux-qt-5.15.2/releases/download/5.15.2/aarch64-linux-qt-5.15.2.tar.gz"
+        tar -xzf qt.tar.gz -C aarch64-linux-qt-5.15.2 --strip-components=1
+
+    - name: Configure xmake
+      run: |
+        xmake f -y -c \
+          --plat=linux \
+          --arch=arm64-v8a \
+          --toolchain=zig \
+          --kind=static \
+          --qt="$(pwd)/aarch64-linux-qt-5.15.2" \
+          --build-platform=YDP02X \
+          --target-channel=dev \
+          -m debug \
+          -vD \
+          --cross=aarch64-linux-gnu.2.27
+
+    - name: Build Project
+      run: xmake build -v
