@@ -56,19 +56,17 @@ jobs:
 
     - name: Patch xmake.lua
       run: |
-        if [ ! -f xmake.lua ]; then
-          echo "Error: xmake.lua not found in root!"
-          find . -name "xmake.lua"
-          exit 1
-        fi
         sed -i "s/add_requires([\"']lame[\"'][^)]*)/add_requires(\"lame\", {configs = {shared = false, frontend = false, nasm = false}})/g" xmake.lua
-        echo "---- Current xmake.lua content (filtered) ----"
-        grep "add_requires" xmake.lua || true
+        
+        echo "==== Updated xmake.lua ===="
+        cat xmake.lua | grep "add_requires" || true
+        
         echo 'set_languages("c++17")' >> xmake.lua
 
     - name: Configure xmake
       run: |
         export MAKEFLAGS="-j1"
+        
         xmake f -y -c \
           --plat=linux \
           --arch=arm64-v8a \
@@ -80,12 +78,9 @@ jobs:
           --qt="$(pwd)/aarch64-linux-qt-5.15.2" \
           --build-platform=YDP02X \
           --target-channel=dev \
-          --lame:shared=false \
-          --lame:frontend=false \
-          --lame:nasm=false \
           -m debug \
           -vD
 
     - name: Build Project
       run: |
-        xmake build -y -v
+        xmake build -y -v --jobs=1
