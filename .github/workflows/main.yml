@@ -56,11 +56,14 @@ jobs:
 
     - name: Patch xmake.lua
       run: |
-        sed -i 's/add_requires("lame"[^)]*)/add_requires("lame", {configs = {shared = false, frontend = false, nasm = false}})/g' xmake.lua
-        
-        echo "---- Updated xmake.lua content ----"
-        grep "add_requires(\"lame\"" xmake.lua
-
+        if [ ! -f xmake.lua ]; then
+          echo "Error: xmake.lua not found in root!"
+          find . -name "xmake.lua"
+          exit 1
+        fi
+        sed -i "s/add_requires([\"']lame[\"'][^)]*)/add_requires(\"lame\", {configs = {shared = false, frontend = false, nasm = false}})/g" xmake.lua
+        echo "---- Current xmake.lua content (filtered) ----"
+        grep "add_requires" xmake.lua || true
         echo 'set_languages("c++17")' >> xmake.lua
 
     - name: Configure xmake
