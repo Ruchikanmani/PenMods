@@ -61,7 +61,6 @@ jobs:
 
     - name: Configure xmake
       run: |
-        xmake require --jobs=1 lame
         xmake f -y -c \
           --plat=linux \
           --arch=arm64-v8a \
