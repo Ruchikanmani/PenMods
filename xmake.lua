@@ -1,5 +1,17 @@
 add_rules('mode.release', 'mode.debug')
-
+set_policy("package.install_jobs", 1)
+set_languages("c++17")
+add_requireconfs("lame", {
+    kind = "static",       
+    override = true,            
+    configs = {nasm = false}, 
+    extra_configs = {
+        configs = {
+            "--disable-frontend", 
+            "--disable-shared"  
+        }
+    }
+})
 add_requires('spdlog        1.15.3')
 add_requires('elfio         3.12')
 add_requires('nlohmann_json 3.12.0')
