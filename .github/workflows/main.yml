@@ -54,22 +54,6 @@ jobs:
         
         chmod +x zig-bin/*
 
-    - name: Patch xmake.lua
-      run: |
-        # 创建一个临时文件，包含我们需要置顶的全局配置
-        cat > xmake_top.lua <<EOF
-        set_policy("package.requires_jobs", 1)
-
-        add_requireconfs("lame", {configs = {shared = false, frontend = false, nasm = false}})
-
-        set_languages("c++17")
-        EOF
-        cat xmake_top.lua xmake.lua > xmake.lua.tmp
-        mv xmake.lua.tmp xmake.lua
-
-        echo "==== Final xmake.lua check (Top 15 lines) ===="
-        head -n 15 xmake.lua
-
     - name: Configure and Build
       env:
         XMAKE_JOBS: 1
