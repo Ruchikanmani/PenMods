@@ -56,11 +56,24 @@ jobs:
 
     - name: Patch xmake.lua
       run: |
-        sed -i 's/add_requires("lame")/add_requires("lame", {configs = {frontend = false, nasm = false}})/g' xmake.lua
+        # 1. 强化正则：匹配 add_requires("lame" ...) 及其后续所有参数并替换
+        # 关键：shared=false 解决 .so 找不到的问题，frontend=false 解决可执行文件链接报错
+        sed -i 's/add_requires("lame"[^)]*)/add_requires("lame", {configs = {shared = false, frontend = false, nasm = false}})/g' xmake.lua
+        
+        # 2. 验证修改是否成功 (Debug)
+        echo "---- Updated xmake.lua content ----"
+        grep "add_requires(\"lame\"" xmake.lua
+        
+        # 3. 强制项目使用 C++17
         echo 'set_languages("c++17")' >> xmake.lua
 
     - name: Configure xmake
       run: |
+        # 强制设置并行任务数为 1，防止 libtool 在交叉编译时链接顺序错乱
+        export MAKEFLAGS="-j1"
+        
+        # 在命令行再次显式传递包配置 (--lame:xxx)
+        # 这样即使 xmake.lua 没改对，命令行参数优先级也是最高的
         xmake f -y -c \
           --plat=linux \
           --arch=arm64-v8a \
@@ -72,9 +85,13 @@ jobs:
           --qt="$(pwd)/aarch64-linux-qt-5.15.2" \
           --build-platform=YDP02X \
           --target-channel=dev \
+          --lame:shared=false \
+          --lame:frontend=false \
+          --lame:nasm=false \
           -m debug \
           -vD
 
     - name: Build Project
       run: |
-        xmake build -v
+        # 编译主项目
+        xmake build -y -v
