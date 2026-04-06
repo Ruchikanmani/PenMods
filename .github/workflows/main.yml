@@ -56,17 +56,13 @@ jobs:
 
     - name: Patch xmake.lua
       run: |
-        sed -i "s/add_requires([\"']lame[\"'][^)]*)/add_requires(\"lame\", {configs = {shared = false, frontend = false, nasm = false}})/g" xmake.lua
-        
-        echo "==== Updated xmake.lua ===="
-        cat xmake.lua | grep "add_requires" || true
-        
+        echo 'add_requireconfs("lame", {configs = {shared = false, frontend = false, nasm = false}})' >> xmake.lua
         echo 'set_languages("c++17")' >> xmake.lua
+        tail -n 5 xmake.lua
 
     - name: Configure xmake
       run: |
-        export MAKEFLAGS="-j1"
-        
+        xmake g --jobs=1
         xmake f -y -c \
           --plat=linux \
           --arch=arm64-v8a \
