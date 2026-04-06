@@ -13,18 +13,27 @@ add_requireconfs("lame", {
             "--enable-static",
             "--with-pic"
         }
+
         if package:is_plat("linux") and package:is_arch("arm64-v8a") then
             table.insert(configs, "--host=aarch64-linux-gnu")
         end
 
         local envs = package:build_envs()
-
         import("package.tools.autoconf").configure(package, configs, {envs = envs})
 
         os.vrunv("make", {"-C", "libmp3lame", "-j" .. os.cpuinfo().ncpu}, {envs = envs})
-        os.vrunv("make", {"-C", "libmp3lame", "install"}, {envs = envs})
 
-        os.cp("include/lame.h", package:installdir("include/lame.h"))
+        local libdir = package:installdir("lib")
+        os.mkdir(libdir)
+        if os.isfile("libmp3lame/.libs/libmp3lame.a") then
+            os.cp("libmp3lame/.libs/libmp3lame.a", libdir)
+        else
+            os.cp("libmp3lame/libmp3lame.a", libdir)
+        end
+
+        local incdir = package:installdir("include/lame")
+        os.mkdir(incdir)
+        os.cp("include/lame.h", incdir .. "/lame.h")
     end
 })
 add_requires('spdlog        1.15.3')
