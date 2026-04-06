@@ -2,15 +2,22 @@ add_rules('mode.release', 'mode.debug')
 set_policy("package.install_jobs", 1)
 set_languages("c++17")
 add_requireconfs("lame", {
-    kind = "static",       
-    override = true,            
-    configs = {nasm = false}, 
-    extra_configs = {
-        configs = {
-            "--disable-frontend", 
-            "--disable-shared"  
+    override = true,
+    kind = "static",
+    configs = {nasm = false},
+    on_install = function (package)
+        local configs = {
+            "--disable-shared",
+            "--disable-frontend",
+            "--disable-gtktest",
+            "--enable-static",
+            "--with-pic"
         }
-    }
+        if package:is_plat("linux") and package:is_arch("arm64-v8a") then
+            table.insert(configs, "--host=aarch64-linux-gnu")
+        end
+        import("package.tools.autoconf").install(package, configs)
+    end
 })
 add_requires('spdlog        1.15.3')
 add_requires('elfio         3.12')
