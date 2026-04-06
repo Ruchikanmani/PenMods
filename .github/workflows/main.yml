@@ -30,6 +30,10 @@ jobs:
 
     - name: Setup Custom GCC 6.5 Toolchain
       run: |
+        sudo apt-get update
+        sudo apt-get install -y zstd curl tar linux-libc-dev-arm64-cross
+        
+        # 2. 下载并解压作者提供的 3 个核心组件
         mkdir -p ~/aarch64-toolchain
         BASE_URL="https://github.com/Redbeanw44602/aarch64-linux-gnu-gcc-6.5.0/releases/download/6.5.0"
         
@@ -41,8 +45,21 @@ jobs:
         tar -I zstd -xf gcc.tar.zst -C ~/aarch64-toolchain
         tar -I zstd -xf glibc.tar.zst -C ~/aarch64-toolchain
         
-        # 验证 bin 目录是否存在并列出文件（用于调试）
-        ls ~/aarch64-toolchain/usr/bin/aarch64-linux-gnu-gcc || echo "GCC not found!"
+        # 3. 关键补丁：将系统安装的 linux 接口头文件链接到工具链中
+        # Ubuntu 的交叉编译头文件路径在 /usr/aarch64-linux-gnu/include
+        INCLUDE_DIR="$HOME/aarch64-toolchain/usr/aarch64-linux-gnu/include"
+        mkdir -p $INCLUDE_DIR
+        
+        # 链接 linux, asm, asm-generic 这三个核心头文件目录
+        ln -s /usr/aarch64-linux-gnu/include/linux $INCLUDE_DIR/linux
+        ln -s /usr/aarch64-linux-gnu/include/asm $INCLUDE_DIR/asm
+        ln -s /usr/aarch64-linux-gnu/include/asm-generic $INCLUDE_DIR/asm-generic
+        
+        # 验证是否链接成功（应该能看到 errno.h）
+        ls -l $INCLUDE_DIR/linux/errno.h
+
+        # 4. 写入环境变量
+        echo "$HOME/aarch64-toolchain/usr/bin" >> $GITHUB_PATH
 
     - name: Download Qt Framework
       run: |
