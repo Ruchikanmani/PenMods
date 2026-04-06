@@ -24,7 +24,6 @@ jobs:
         xmake-version: latest
 
     - name: Install Kernel Headers
-      # 即使不用 GCC 6.5，Zig 有时也需要系统内核头文件来处理 errno.h 等底层调用
       run: |
         sudo apt-get update
         sudo apt-get install -y linux-libc-dev-arm64-cross
@@ -37,10 +36,8 @@ jobs:
 
     - name: Create Zig Toolchain Wrappers
       run: |
-        # 创建包装脚本，强制 Zig 使用 2.27 目标并包含内核头文件
         mkdir -p zig-bin
         ZIG_EXE=$(which zig)
-        # 注意：这里加入了内核头文件的搜索路径，解决之前 errno.h 丢失的问题
         K_HEADERS="-I/usr/aarch64-linux-gnu/include"
         
         echo "#!/bin/bash" > zig-bin/cc
@@ -59,17 +56,18 @@ jobs:
 
     - name: Patch xmake.lua
       run: |
-        # 1. 修复 lame 报错
-        sed -i 's/add_requires("lame")/add_requires("lame", {configs = {frontend = false, nasm = false}})/g' xmake.lua
-        # 2. 强制项目使用 C++17 标准以支持 string_view
+        # 1. 彻底解决 lame 报错：
+        # - shared=false: 强制编译静态库，避开 libtool 对 .so 的路径处理问题
+        # - frontend=false: 不编译 lame 命令行工具（报错就在这里），只保留库
+        # - nasm=false: 交叉编译环境下禁用汇编优化以增强兼容性
+        sed -i 's/add_requires("lame")/add_requires("lame", {configs = {shared = false, frontend = false, nasm = false}})/g' xmake.lua
+        
+        # 2. 强制项目使用 C++17 标准
         echo 'set_languages("c++17")' >> xmake.lua
 
     - name: Configure xmake
       run: |
-        # 重点：
-        # 1. 不传 --sdk 和 --cross，防止 xmake 回退到旧 GCC
-        # 2. 直接把我们的 zig-bin 传给 --cc / --cxx
-        # 3. 这样 spdlog 和 elfio 就能看到现代编译器的 string_view 了
+        # 增加 --jobs=1 确保在配置包阶段不会因为并行导致竞争（可选，但更保险）
         xmake f -y -c \
           --plat=linux \
           --arch=arm64-v8a \
@@ -86,4 +84,6 @@ jobs:
 
     - name: Build Project
       run: |
+        # 如果 lame 依然报错，尝试强制先安装依赖
+        xmake require -y lame
         xmake build -v
