@@ -1,6 +1,6 @@
 add_rules('mode.release', 'mode.debug')
-set_policy("package.install_jobs", 1)
 set_languages("c++17")
+
 add_requireconfs("lame", {
     override = true,
     kind = "static",
@@ -13,10 +13,19 @@ add_requireconfs("lame", {
             "--enable-static",
             "--with-pic"
         }
+        
         if package:is_plat("linux") and package:is_arch("arm64-v8a") then
             table.insert(configs, "--host=aarch64-linux-gnu")
         end
-        import("package.tools.autoconf").install(package, configs)
+
+        local envs = {}
+        envs.CC     = package:build_getenv("cc")
+        envs.AS     = package:build_getenv("as")
+        envs.AR     = package:build_getenv("ar")
+        envs.RANLIB = package:build_getenv("ranlib")
+        envs.LD     = package:build_getenv("ld")
+
+        import("package.tools.autoconf").install(package, configs, {envs = envs})
     end
 })
 add_requires('spdlog        1.15.3')
